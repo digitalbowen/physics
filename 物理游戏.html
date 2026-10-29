@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Golf</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #05060a;
+    --panel: #0e1120;
+    --panel-2: #141830;
+    --line: #232842;
+    --text: #e6e9f5;
+    --muted: #8b90a8;
+    --accent: #6ea8ff;
+    --accent-2: #ffcf6e;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: 1px; }
+  header h1 .dot { color: var(--accent); }
+  main { flex: 1 1 auto; position: relative; overflow: hidden; }
+  .section { position: absolute; inset: 0; }
+  .topbar {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(14, 17, 32, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    user-select: none;
+    z-index: 5;
+  }
+  .topbar .level-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-2);
+    font-variant-numeric: tabular-nums;
+    min-width: 150px;
+    text-align: center;
+  }
+  .topbar .btn { flex: 0 0 auto; }
+  .btn {
+    flex: 1 1 auto;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .15s;
+    min-width: 64px;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #04122e; border-color: var(--accent); font-weight: 600; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(14, 17, 32, 0.85);
+    border: 1px solid var(--line);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    color: var(--muted);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .hint b { color: var(--accent); }
+  .stats {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(14, 17, 32, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    pointer-events: none;
+    min-width: 110px;
+  }
+  .stats span { color: var(--accent-2); }
+
+  /* 引力高尔夫 */
+  #golf-wrap { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, #0a1226, #05060a 75%); }
+  #golfCanvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  .golf-msg {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  .golf-msg.show { opacity: 1; }
+  .golf-msg .big { font-size: 40px; font-weight: 700; letter-spacing: 1px; }
+  .golf-msg .sub { font-size: 15px; color: var(--muted); margin-top: 8px; }
+  .golf-msg .win { color: var(--accent-2); }
+  .golf-msg .fail { color: #ff5a6e; }
+  .golf-msg .btn { pointer-events: auto; margin-top: 16px; display: inline-block; }
+</style>
+</head>
+<body>
+  <header>
+    <h1><span class="dot">◉</span> Gravity Golf</h1>
+  </header>
+
+  <main>
+    <!-- Gravity Golf: launch a probe into the target ring using gravity -->
+    <section class="section" id="golf">
+      <div id="golf-wrap">
+        <canvas id="golfCanvas"></canvas>
+
+        <div class="topbar">
+          <button class="btn" id="golfPrevBtn">◀ Prev</button>
+          <span class="level-name" id="golfLevelName">1 / 5</span>
+          <button class="btn" id="golfNextBtn">Next ▶</button>
+        </div>
+
+        <div class="stats">
+          Strokes <span id="golfStrokes">0</span> · Par <span id="golfPar">2</span><br>
+          Total <span id="golfTotal">0</span> · <span id="golfState">Aim</span>
+        </div>
+
+        <div class="golf-msg" id="golfMsg">
+          <div class="big" id="golfMsgBig">Hole in one!</div>
+          <div class="sub" id="golfMsgSub"></div>
+          <button class="btn primary" id="golfMsgBtn" style="margin-top:16px;">Next level</button>
+        </div>
+
+        <div class="hint">
+          <b>Drag</b> from the pad to aim &amp; set power · release to launch · reach the <b>gold ring</b>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  // ========== 引力高尔夫 ==========
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const golfCanvas = document.getElementById('golfCanvas');
+  const gctx = golfCanvas.getContext('2d');
+  let GW = 0, GH = 0;
+  // 关卡定义：坐标用 0~1 相对值，随画布缩放。
+  // start=发射台, hole=目标环, stars=引力恒星(mass), par=标准杆
+  const LEVELS = [
+    { name: 'First Orbit', par: 2,
+      start: { x: 0.15, y: 0.75 },
+      hole:  { x: 0.85, y: 0.25 },
+      stars: [ { x: 0.5, y: 0.5, mass: 6000 } ] },
+    { name: 'Slalom', par: 4,
+      start: { x: 0.1, y: 0.5 },
+      hole:  { x: 0.9, y: 0.5 },
+      stars: [ { x: 0.32, y: 0.7,  mass: 5500 },
+               { x: 0.5,  y: 0.32, mass: 5000 },
+               { x: 0.68, y: 0.68, mass: 5500 } ] },
+    { name: 'Crossfire', par: 4,
+      start: { x: 0.15, y: 0.85 },
+      hole:  { x: 0.85, y: 0.15 },
+      stars: [ { x: 0.4,  y: 0.75, mass: 6000 },
+               { x: 0.3,  y: 0.4,  mass: 4500 },
+               { x: 0.62, y: 0.55, mass: 6500 },
+               { x: 0.72, y: 0.28, mass: 4000 } ] },
+    { name: 'The Belt', par: 4,
+      start: { x: 0.1, y: 0.5 },
+      hole:  { x: 0.9, y: 0.5 },
+      stars: [ { x: 0.35, y: 0.3, mass: 5000 },
+               { x: 0.55, y: 0.7, mass: 5000 },
+               { x: 0.7,  y: 0.35, mass: 5000 },
+               { x: 0.45, y: 0.55, mass: 4000 } ] },
+  ];
+
+  const GOLF_G = 1.0;        // 引力常数
+  const GOLF_SOFTEN = 6;     // 软化半径
+  const GOLF_DT = 0.5;       // 时间步长
+  const GOLF_SUBSTEPS = 4;   // 子步数（防止穿过恒星）
+  const PROBE_R = 5;         // 探测器半径
+  const HOLE_R = 22;         // 目标环命中半径
+  const LAUNCH_SCALE = 0.06; // 拖拽 → 初速度
+  const MAX_POWER = 260;     // 最大拖拽像素
+
+  const golf = {
+    levelIdx: 0,
+    strokes: 0,
+    total: 0,
+    state: 'aim',          // 'aim' | 'flying' | 'won'
+    stars: [],             // 像素坐标 { x, y, mass, r }
+    start: { x: 0, y: 0 },
+    hole: { x: 0, y: 0 },
+    probe: { x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, trail: [] },
+    lastTrail: [],         // 上一次发射的完整路径（虚线显示）
+  };
+
+  function starRadius(m) { return Math.max(10, Math.cbrt(m) * 1.3); }
+
+  function golfResize() {
+    const wrap = document.getElementById('golf-wrap');
+    const r = wrap.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    GW = r.width; GH = r.height;
+    golfCanvas.width = GW * DPR;
+    golfCanvas.height = GH * DPR;
+    gctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildLevelPixels();
+  }
+  new ResizeObserver(golfResize).observe(document.getElementById('golf-wrap'));
+
+  // 相对坐标 → 像素
+  function buildLevelPixels() {
+    const L = LEVELS[golf.levelIdx];
+    golf.start = { x: L.start.x * GW, y: L.start.y * GH };
+    golf.hole  = { x: L.hole.x * GW,  y: L.hole.y * GH };
+    golf.stars = L.stars.map(s => ({
+      x: s.x * GW, y: s.y * GH, mass: s.mass, r: starRadius(s.mass)
+    }));
+    if (golf.state !== 'flying') resetProbe();
+  }
+
+  function resetProbe() {
+    golf.probe.x = golf.start.x;
+    golf.probe.y = golf.start.y;
+    golf.probe.vx = golf.probe.vy = 0;
+    golf.probe.ax = golf.probe.ay = 0;
+    golf.probe.trail = [];
+  }
+  function loadLevel(idx) {
+    golf.levelIdx = (idx + LEVELS.length) % LEVELS.length;
+    golf.strokes = 0;
+    golf.state = 'aim';
+    hideMsg();
+    golf.lastTrail = [];
+    buildLevelPixels();
+    resetProbe();
+    if (golf.levelIdx === 0) golf.demoShot = solveDemoShot();
+    updateGolfHUD();
+  }
+
+  // 纯模拟：给定初速度，判断能否命中目标（不触发任何回调/副作用）
+  function simulateShot(vx0, vy0) {
+    const p = { x: golf.start.x, y: golf.start.y, vx: vx0, vy: vy0 };
+    let a = golfAccel(p); p.ax = a.ax; p.ay = a.ay;
+    const dt = GOLF_DT / GOLF_SUBSTEPS;
+    const maxSteps = 4000, m = 60;
+    for (let n = 0; n < maxSteps; n++) {
+      p.vx += 0.5 * p.ax * dt; p.vy += 0.5 * p.ay * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      a = golfAccel(p); p.ax = a.ax; p.ay = a.ay;
+      p.vx += 0.5 * p.ax * dt; p.vy += 0.5 * p.ay * dt;
+      const hx = p.x - golf.hole.x, hy = p.y - golf.hole.y;
+      if (hx * hx + hy * hy < HOLE_R * HOLE_R) return true;
+      for (const s of golf.stars) {
+        const dx = p.x - s.x, dy = p.y - s.y;
+        if (dx * dx + dy * dy < (s.r + PROBE_R) * (s.r + PROBE_R)) return false;
+      }
+      if (p.x < -m || p.x > GW + m || p.y < -m || p.y > GH + m) return false;
+    }
+    return false;
+  }
+
+  // 扫描角度与力度，找出一条能进洞的发射方向，供引导示范使用
+  function solveDemoShot() {
+    const baseAng = Math.atan2(golf.hole.y - golf.start.y, golf.hole.x - golf.start.x);
+    for (let dp = 0; dp <= 0.9; dp += 0.02) {              // 从直瞄开始逐步偏移
+      for (const sign of [1, -1]) {
+        const ang = baseAng + sign * dp;
+        for (let power = 0.35; power <= 1.0; power += 0.05) {
+          const v = power * MAX_POWER * LAUNCH_SCALE;
+          if (simulateShot(Math.cos(ang) * v, Math.sin(ang) * v)) {
+            return { ang, power };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // 探测器加速度：受所有恒星引力
+  function golfAccel(p) {
+    let ax = 0, ay = 0;
+    for (const s of golf.stars) {
+      const dx = s.x - p.x, dy = s.y - p.y;
+      const dist2 = dx * dx + dy * dy + GOLF_SOFTEN * GOLF_SOFTEN;
+      const invDist = 1 / Math.sqrt(dist2);
+      const invDist3 = invDist * invDist * invDist;
+      const f = GOLF_G * s.mass * invDist3;
+      ax += f * dx;
+      ay += f * dy;
+    }
+    return { ax, ay };
+  }
+
+  // 一子步 Velocity Verlet；返回本步是否结束飞行
+  function golfStep(dt) {
+    const p = golf.probe;
+    p.vx += 0.5 * p.ax * dt;
+    p.vy += 0.5 * p.ay * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    const a = golfAccel(p);
+    p.ax = a.ax; p.ay = a.ay;
+    p.vx += 0.5 * p.ax * dt;
+    p.vy += 0.5 * p.ay * dt;
+
+    // 命中目标环？
+    const hx = p.x - golf.hole.x, hy = p.y - golf.hole.y;
+    if (hx * hx + hy * hy < HOLE_R * HOLE_R) { onWin(); return true; }
+
+    // 撞恒星？
+    for (const s of golf.stars) {
+      const dx = p.x - s.x, dy = p.y - s.y;
+      if (dx * dx + dy * dy < (s.r + PROBE_R) * (s.r + PROBE_R)) { onMiss('Crashed into a star'); return true; }
+    }
+
+    // 飞出边界？
+    const m = 60;
+    if (p.x < -m || p.x > GW + m || p.y < -m || p.y > GH + m) { onMiss('Lost in space'); return true; }
+
+    return false;
+  }
+
+  function onWin() {
+    golf.state = 'won';
+    golf.total += golf.strokes;
+    const par = LEVELS[golf.levelIdx].par;
+    const diff = golf.strokes - par;
+    let label;
+    if (golf.strokes === 1) label = 'Hole in one!';
+    else if (diff < 0) label = `Under par (−${-diff})`;
+    else if (diff === 0) label = 'Par';
+    else label = `Over par (+${diff})`;
+    const last = golf.levelIdx === LEVELS.length - 1;
+    showMsg('win', label,
+      `Sank it in ${golf.strokes} stroke${golf.strokes > 1 ? 's' : ''}`,
+      last ? 'Play again' : 'Next level');
+    updateGolfHUD();
+  }
+
+  function onMiss(reason) {
+    golf.state = 'aim';
+    golf.lastTrail = golf.probe.trail.slice();   // 保留本次路径供对照
+    resetProbe();
+    flashMsg('fail', 'Missed', reason);
+    updateGolfHUD();
+  }
+  // ---------- 渲染 ----------
+  function golfDraw() {
+    gctx.clearRect(0, 0, GW, GH);
+
+    // 目标环（金色脉冲）
+    const pulse = 1 + 0.12 * Math.sin(performance.now() / 300);
+    gctx.beginPath();
+    gctx.arc(golf.hole.x, golf.hole.y, HOLE_R * pulse, 0, Math.PI * 2);
+    gctx.strokeStyle = '#ffcf6e';
+    gctx.lineWidth = 3;
+    gctx.stroke();
+    gctx.beginPath();
+    gctx.arc(golf.hole.x, golf.hole.y, 4, 0, Math.PI * 2);
+    gctx.fillStyle = '#ffcf6e';
+    gctx.fill();
+
+    // 恒星
+    for (const s of golf.stars) {
+      gctx.beginPath();
+      gctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      gctx.fillStyle = '#ffb347';
+      gctx.shadowBlur = 30;
+      gctx.shadowColor = '#ff8c1a';
+      gctx.fill();
+    }
+    gctx.shadowBlur = 0;
+
+    // 发射台
+    gctx.beginPath();
+    gctx.arc(golf.start.x, golf.start.y, 8, 0, Math.PI * 2);
+    gctx.strokeStyle = '#8b90a8';
+    gctx.lineWidth = 2;
+    gctx.stroke();
+
+    // 上一次发射路径（暗色虚线，供对照）
+    const last = golf.lastTrail;
+    if (last.length > 1) {
+      gctx.save();
+      gctx.setLineDash([5, 6]);
+      gctx.beginPath();
+      gctx.moveTo(last[0].x, last[0].y);
+      for (let i = 1; i < last.length; i++) gctx.lineTo(last[i].x, last[i].y);
+      gctx.strokeStyle = 'rgba(139, 144, 168, 0.45)';
+      gctx.lineWidth = 1.5;
+      gctx.stroke();
+      gctx.restore();
+    }
+
+    // 探测器轨迹
+    const trail = golf.probe.trail;
+    if (trail.length > 1) {
+      gctx.beginPath();
+      gctx.moveTo(trail[0].x, trail[0].y);
+      for (let i = 1; i < trail.length; i++) gctx.lineTo(trail[i].x, trail[i].y);
+      gctx.strokeStyle = 'rgba(110, 168, 255, 0.5)';
+      gctx.lineWidth = 1.5;
+      gctx.stroke();
+    }
+
+    // 探测器
+    if (golf.state !== 'won') {
+      gctx.beginPath();
+      gctx.arc(golf.probe.x, golf.probe.y, PROBE_R, 0, Math.PI * 2);
+      gctx.fillStyle = '#6ea8ff';
+      gctx.shadowBlur = 14;
+      gctx.shadowColor = '#6ea8ff';
+      gctx.fill();
+      gctx.shadowBlur = 0;
+    }
+
+    // 瞄准线（拖拽中）
+    if (gdrag.active) {
+      let dx = gdrag.x1 - golf.start.x, dy = gdrag.y1 - golf.start.y;
+      const len = Math.hypot(dx, dy);
+      const clamped = Math.min(len, MAX_POWER);
+      if (len > 0) { dx = dx / len * clamped; dy = dy / len * clamped; }
+      const power = clamped / MAX_POWER;
+      gctx.beginPath();
+      gctx.moveTo(golf.start.x, golf.start.y);
+      gctx.lineTo(golf.start.x + dx, golf.start.y + dy);
+      gctx.strokeStyle = `hsl(${(1 - power) * 140}, 85%, 60%)`;
+      gctx.lineWidth = 2.5;
+      gctx.stroke();
+      // 箭头
+      const ang = Math.atan2(dy, dx);
+      gctx.beginPath();
+      gctx.moveTo(golf.start.x + dx, golf.start.y + dy);
+      gctx.lineTo(golf.start.x + dx - 10 * Math.cos(ang - 0.4), golf.start.y + dy - 10 * Math.sin(ang - 0.4));
+      gctx.lineTo(golf.start.x + dx - 10 * Math.cos(ang + 0.4), golf.start.y + dy - 10 * Math.sin(ang + 0.4));
+      gctx.closePath();
+      gctx.fillStyle = `hsl(${(1 - power) * 140}, 85%, 60%)`;
+      gctx.fill();
+    }
+
+    drawTutorial();
+  }
+
+  // ---------- 第一关引导教学 ----------
+  // 只在第一关、尚未出杆、且未在拖拽时显示
+  function drawTutorial() {
+    if (golf.levelIdx !== 0 || golf.state !== 'aim' || golf.strokes !== 0 || gdrag.active) return;
+    const t = performance.now() / 1000;
+    const sx = golf.start.x, sy = golf.start.y;
+
+    // 拖拽手势示范：沿“已解出的可命中方向”伸缩，长度对应所需力度
+    const shot = golf.demoShot;
+    const dirAng = shot ? shot.ang
+                        : Math.atan2(golf.hole.y - sy, golf.hole.x - sx);
+    const fullLen = (shot ? shot.power : 0.7) * MAX_POWER;   // 到达该力度的拖拽像素
+    const osc = Math.sin(t * 2) * 0.5 + 0.5;                 // 0~1 脉冲
+    const L = fullLen * (0.35 + 0.65 * osc);                 // 在 35%~100% 力度间伸缩
+    const ex = sx + Math.cos(dirAng) * L, ey = sy + Math.sin(dirAng) * L;
+
+    gctx.save();
+    gctx.setLineDash([6, 6]);
+    gctx.beginPath();
+    gctx.moveTo(sx, sy);
+    gctx.lineTo(ex, ey);
+    gctx.strokeStyle = 'rgba(110,168,255,0.9)';
+    gctx.lineWidth = 2;
+    gctx.stroke();
+    gctx.setLineDash([]);
+    // 拖拽的“手”
+    gctx.beginPath();
+    gctx.arc(ex, ey, 7, 0, Math.PI * 2);
+    gctx.fillStyle = 'rgba(255,255,255,0.95)';
+    gctx.fill();
+    // 箭头
+    const ah = Math.atan2(ey - sy, ex - sx);
+    gctx.beginPath();
+    gctx.moveTo(ex, ey);
+    gctx.lineTo(ex - 11 * Math.cos(ah - 0.4), ey - 11 * Math.sin(ah - 0.4));
+    gctx.lineTo(ex - 11 * Math.cos(ah + 0.4), ey - 11 * Math.sin(ah + 0.4));
+    gctx.closePath();
+    gctx.fillStyle = 'rgba(110,168,255,0.9)';
+    gctx.fill();
+    gctx.restore();
+
+    // 编号标注
+    tutorPill(sx, sy + 34, '① 从发射台拖拽，松手发射', '#6ea8ff');
+    tutorPill(golf.hole.x, golf.hole.y + 40, '② 目标：飞进金色圆环', '#ffcf6e');
+    const star = golf.stars[0];
+    if (star) tutorPill(star.x, star.y - star.r - 20, '③ 恒星引力会拉弯轨迹，借力绕过它', '#ffb347');
+  }
+
+  // 圆角文字气泡（居中于 cx,cy）
+  function tutorPill(cx, cy, text, color) {
+    gctx.font = '600 13px "Microsoft YaHei","Segoe UI",sans-serif';
+    gctx.textAlign = 'center';
+    gctx.textBaseline = 'middle';
+    const w = gctx.measureText(text).width, padX = 11, h = 26;
+    const x = cx - w / 2 - padX, y = cy - h / 2;
+    gctx.beginPath();
+    gctx.roundRect(x, y, w + padX * 2, h, 8);
+    gctx.fillStyle = 'rgba(14,17,32,0.92)';
+    gctx.fill();
+    gctx.strokeStyle = 'rgba(35,40,66,1)';
+    gctx.lineWidth = 1;
+    gctx.stroke();
+    gctx.fillStyle = color;
+    gctx.fillText(text, cx, cy);
+  }
+
+  // ---------- 主循环 ----------
+  function golfLoop() {
+    if (golf.state === 'flying') {
+      for (let s = 0; s < GOLF_SUBSTEPS; s++) {
+        if (golfStep(GOLF_DT / GOLF_SUBSTEPS)) break;
+      }
+      const p = golf.probe;
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 600) p.trail.shift();
+    }
+    golfDraw();
+    requestAnimationFrame(golfLoop);
+  }
+  requestAnimationFrame(golfLoop);
+
+  // ---------- 交互 ----------
+  const gdrag = { active: false, x1: 0, y1: 0 };
+  function golfPos(e) {
+    const r = golfCanvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  golfCanvas.addEventListener('mousedown', e => {
+    if (golf.state !== 'aim') return;
+    const p = golfPos(e);
+    gdrag.active = true;
+    gdrag.x1 = p.x; gdrag.y1 = p.y;
+  });
+  golfCanvas.addEventListener('mousemove', e => {
+    if (!gdrag.active) return;
+    const p = golfPos(e);
+    gdrag.x1 = p.x; gdrag.y1 = p.y;
+  });
+  window.addEventListener('mouseup', () => {
+    if (!gdrag.active) return;
+    gdrag.active = false;
+    let dx = gdrag.x1 - golf.start.x, dy = gdrag.y1 - golf.start.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 6) return;                 // 太短，忽略
+    const clamped = Math.min(len, MAX_POWER);
+    dx = dx / len * clamped; dy = dy / len * clamped;
+    resetProbe();
+    golf.probe.vx = dx * LAUNCH_SCALE;
+    golf.probe.vy = dy * LAUNCH_SCALE;
+    const a = golfAccel(golf.probe);
+    golf.probe.ax = a.ax; golf.probe.ay = a.ay;
+    golf.strokes++;
+    golf.state = 'flying';
+    updateGolfHUD();
+  });
+
+  // ---------- HUD & 消息 ----------
+  function updateGolfHUD() {
+    document.getElementById('golfLevelName').textContent =
+      `${golf.levelIdx + 1} / ${LEVELS.length} · ${LEVELS[golf.levelIdx].name}`;
+    document.getElementById('golfStrokes').textContent = golf.strokes;
+    document.getElementById('golfPar').textContent = LEVELS[golf.levelIdx].par;
+    document.getElementById('golfTotal').textContent = golf.total;
+    document.getElementById('golfState').textContent =
+      golf.state === 'flying' ? 'Flying' : golf.state === 'won' ? 'Sunk' : 'Aim';
+  }
+
+  const golfMsg = document.getElementById('golfMsg');
+  let flashTimer = null;
+  function showMsg(kind, big, sub, btnLabel) {
+    document.getElementById('golfMsgBig').className = 'big ' + kind;
+    document.getElementById('golfMsgBig').textContent = big;
+    document.getElementById('golfMsgSub').textContent = sub || '';
+    const btn = document.getElementById('golfMsgBtn');
+    btn.textContent = btnLabel;
+    btn.style.display = btnLabel ? 'inline-block' : 'none';
+    golfMsg.classList.add('show');
+  }
+  function hideMsg() { golfMsg.classList.remove('show'); }
+  function flashMsg(kind, big, sub) {
+    document.getElementById('golfMsgBtn').style.display = 'none';
+    document.getElementById('golfMsgBig').className = 'big ' + kind;
+    document.getElementById('golfMsgBig').textContent = big;
+    document.getElementById('golfMsgSub').textContent = sub || '';
+    golfMsg.classList.add('show');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => golfMsg.classList.remove('show'), 1200);
+  }
+
+  document.getElementById('golfMsgBtn').addEventListener('click', () => {
+    loadLevel(golf.levelIdx + 1);
+  });
+  document.getElementById('golfPrevBtn').addEventListener('click', () => loadLevel(golf.levelIdx - 1));
+  document.getElementById('golfNextBtn').addEventListener('click', () => loadLevel(golf.levelIdx + 1));
+
+  // 初始化
+  golfResize();
+  loadLevel(0);
+  </script>
+</body>
+</html>
+

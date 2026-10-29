@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Physics Phenomena Visualized</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #05060a;
+    --panel: #0e1120;
+    --panel-2: #141830;
+    --line: #232842;
+    --text: #e6e9f5;
+    --muted: #8b90a8;
+    --accent: #6ea8ff;
+    --accent-2: #ffcf6e;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: 1px; }
+  header h1 .dot { color: var(--accent); }
+  nav { display: flex; gap: 8px; margin-left: 8px; }
+  nav button {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid transparent;
+    padding: 6px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all .15s;
+  }
+  nav button:hover { color: var(--text); background: var(--panel-2); }
+  nav button.active { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+  .game-link {
+    margin-left: auto;
+    background: var(--accent);
+    color: #04122e;
+    border: 1px solid var(--accent);
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .game-link:hover { background: var(--accent-2); border-color: var(--accent-2); }
+  main { flex: 1 1 auto; position: relative; overflow: hidden; }
+  .section { position: absolute; inset: 0; display: none; }
+  .section.active { display: block; }
+
+  /* 引力沙盒布局 */
+  #sim-wrap { position: absolute; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  .panel {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 250px;
+    background: rgba(14, 17, 32, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    user-select: none;
+  }
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .ctrl { margin-bottom: 12px; }
+  .ctrl label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    color: var(--text);
+  }
+  .ctrl label .val { color: var(--accent-2); font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    flex: 1 1 auto;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .15s;
+    min-width: 64px;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #04122e; border-color: var(--accent); font-weight: 600; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .toggle-row input { accent-color: var(--accent); cursor: pointer; }
+  .toggle-row label { cursor: pointer; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(14, 17, 32, 0.85);
+    border: 1px solid var(--line);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    color: var(--muted);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .hint b { color: var(--accent); }
+  .stats {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(14, 17, 32, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    pointer-events: none;
+    min-width: 110px;
+  }
+  .stats span { color: var(--accent-2); }
+
+</style>
+</head>
+<body>
+  <header>
+    <h1><span class="dot">◉</span> Physics Phenomena Visualized</h1>
+    <nav>
+      <button class="active" data-tab="mechanics">Mechanics</button>
+    </nav>
+    <a class="game-link" href="物理游戏.html">🎮 Game</a>
+  </header>
+
+  <main>
+    <!-- Mechanics: gravity sandbox -->
+    <section class="section active" id="mechanics">
+      <div id="sim-wrap">
+        <canvas id="canvas"></canvas>
+
+        <div class="panel">
+          <h2>Gravity Sandbox · N-Body</h2>
+
+          <div class="ctrl">
+            <label>Gravity constant G <span class="val" id="gVal">1.0</span></label>
+            <input type="range" id="gSlider" min="0" max="5" step="0.05" value="1">
+          </div>
+
+          <div class="ctrl">
+            <label>Cosmic expansion <span class="val" id="expVal">0.0</span></label>
+            <input type="range" id="expSlider" min="-0.4" max="0.6" step="0.01" value="0">
+          </div>
+
+          <div class="ctrl">
+            <label>New body mass <span class="val" id="massVal">20</span></label>
+            <input type="range" id="massSlider" min="2" max="400" step="1" value="20">
+          </div>
+
+          <div class="toggle-row">
+            <input type="checkbox" id="trailChk" checked>
+            <label for="trailChk">Motion trails</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="mergeChk" checked>
+            <label for="mergeChk">Collision merge</label>
+          </div>
+
+          <div class="btn-row" style="margin-bottom:8px;">
+            <button class="btn primary" id="playBtn">Pause</button>
+            <button class="btn" id="clearBtn">Clear</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="galaxyBtn">Galaxy</button>
+            <button class="btn" id="binaryBtn">Binary</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          Bodies <span id="countStat">0</span><br>
+          <span id="fpsStat">0</span> fps
+        </div>
+
+        <div class="hint">
+          <b>Drag</b> to launch a body · <b>Click</b> to place at rest · sliders tune G &amp; expansion
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  // ---------- 标签切换 ----------
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+      resize();
+    });
+  });
+
+  // ---------- Canvas 初始化 ----------
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    const wrap = document.getElementById('sim-wrap');
+    const r = wrap.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- 物理参数 ----------
+  const params = {
+    G: 1.0,          // 引力常数
+    expansion: 0.0,  // 宇宙膨胀率（哈勃流）
+    newMass: 20,     // 新星体质量
+    trails: true,    // 拖尾
+    merge: true,     // 碰撞合并
+    running: true,
+  };
+  const SOFTEN = 4;      // 软化半径，避免近距离力发散
+  const DT = 0.5;        // 时间步长
+  const SUBSTEPS = 2;    // 每帧子步数，提升稳定性
+
+  // ---------- 星体 ----------
+  let bodies = [];
+  let idCounter = 0;
+
+  function massToRadius(m) {
+    return Math.max(2, Math.cbrt(m) * 1.8);
+  }
+  // 质量 → 颜色：小=蓝白，中=金黄，大=红
+  function massToColor(m) {
+    const t = Math.min(1, Math.log10(m + 1) / 2.8);
+    const hue = 220 - t * 220;          // 220(蓝) → 0(红)
+    const light = 62 + (1 - t) * 18;
+    return `hsl(${hue}, 85%, ${light}%)`;
+  }
+
+  class Body {
+    constructor(x, y, vx, vy, mass) {
+      this.id = idCounter++;
+      this.x = x; this.y = y;
+      this.vx = vx; this.vy = vy;
+      this.ax = 0; this.ay = 0;
+      this.mass = mass;
+      this.r = massToRadius(mass);
+      this.color = massToColor(mass);
+      this.trail = [];
+    }
+    setMass(m) {
+      this.mass = m;
+      this.r = massToRadius(m);
+      this.color = massToColor(m);
+    }
+  }
+  // ---------- 计算加速度（成对万有引力）----------
+  function computeAccelerations() {
+    for (const b of bodies) { b.ax = 0; b.ay = 0; }
+    for (let i = 0; i < bodies.length; i++) {
+      const a = bodies[i];
+      for (let j = i + 1; j < bodies.length; j++) {
+        const b = bodies[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const dist2 = dx * dx + dy * dy + SOFTEN * SOFTEN;
+        const invDist = 1 / Math.sqrt(dist2);
+        const invDist3 = invDist * invDist * invDist;
+        const f = params.G * invDist3;   // F/m 部分：G / r^3 * 分量
+        // a_i += G * m_j * r / |r|^3
+        a.ax += f * b.mass * dx;
+        a.ay += f * b.mass * dy;
+        b.ax -= f * a.mass * dx;
+        b.ay -= f * a.mass * dy;
+      }
+    }
+  }
+
+  // ---------- 质心 ----------
+  function centerOfMass() {
+    let mx = 0, my = 0, M = 0;
+    for (const b of bodies) { mx += b.x * b.mass; my += b.y * b.mass; M += b.mass; }
+    if (M === 0) return { x: W / 2, y: H / 2 };
+    return { x: mx / M, y: my / M };
+  }
+
+  // ---------- 一步积分：Velocity Verlet ----------
+  function step(dt) {
+    if (bodies.length === 0) return;
+    // v(t+½dt) = v + ½ a dt ; x += v dt
+    for (const b of bodies) {
+      b.vx += 0.5 * b.ax * dt;
+      b.vy += 0.5 * b.ay * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+    // 用新位置重算加速度
+    computeAccelerations();
+    // v(t+dt) = v(t+½dt) + ½ a(t+dt) dt
+    for (const b of bodies) {
+      b.vx += 0.5 * b.ax * dt;
+      b.vy += 0.5 * b.ay * dt;
+    }
+
+    // 宇宙膨胀：哈勃流 v += H * (r - r_cm)
+    if (params.expansion !== 0) {
+      const cm = centerOfMass();
+      const H0 = params.expansion * 0.01;
+      for (const b of bodies) {
+        b.vx += (b.x - cm.x) * H0 * dt;
+        b.vy += (b.y - cm.y) * H0 * dt;
+      }
+    }
+
+    if (params.merge) handleMerges();
+  }
+
+  // ---------- 碰撞合并（动量守恒）----------
+  function handleMerges() {
+    for (let i = 0; i < bodies.length; i++) {
+      const a = bodies[i];
+      if (!a) continue;
+      for (let j = i + 1; j < bodies.length; j++) {
+        const b = bodies[j];
+        if (!b) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < (a.r + b.r) * 0.7) {
+          // 合并到较大者，动量守恒
+          const big = a.mass >= b.mass ? a : b;
+          const small = big === a ? b : a;
+          const M = a.mass + b.mass;
+          big.x = (a.x * a.mass + b.x * b.mass) / M;
+          big.y = (a.y * a.mass + b.y * b.mass) / M;
+          big.vx = (a.vx * a.mass + b.vx * b.mass) / M;
+          big.vy = (a.vy * a.mass + b.vy * b.mass) / M;
+          big.setMass(M);
+          bodies[bodies.indexOf(small)] = null;
+        }
+      }
+    }
+    bodies = bodies.filter(Boolean);
+  }
+  // ---------- 渲染 ----------
+  function draw() {
+    // 拖尾：半透明覆盖形成余晖；否则整幕清空
+    if (params.trails) {
+      ctx.fillStyle = 'rgba(5, 6, 10, 0.22)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#05060a';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    for (const b of bodies) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = b.color;
+      ctx.shadowBlur = Math.min(40, b.r * 3);
+      ctx.shadowColor = b.color;
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    // 抛射瞄准线
+    if (drag.active) {
+      ctx.beginPath();
+      ctx.arc(drag.x0, drag.y0, massToRadius(params.newMass), 0, Math.PI * 2);
+      ctx.fillStyle = massToColor(params.newMass);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(drag.x0, drag.y0);
+      ctx.lineTo(drag.x1, drag.y1);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // ---------- 主循环 ----------
+  let lastT = performance.now(), fpsAcc = 0, fpsCount = 0, fpsShown = 0;
+  function loop(now) {
+    const frameDt = now - lastT;
+    lastT = now;
+    fpsAcc += frameDt; fpsCount++;
+    if (fpsAcc >= 500) {
+      fpsShown = Math.round(1000 / (fpsAcc / fpsCount));
+      fpsAcc = 0; fpsCount = 0;
+      document.getElementById('fpsStat').textContent = fpsShown;
+    }
+
+    if (params.running && bodies.length) {
+      computeAccelerations();
+      for (let s = 0; s < SUBSTEPS; s++) step(DT / SUBSTEPS);
+    }
+    draw();
+    document.getElementById('countStat').textContent = bodies.length;
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ---------- 鼠标交互：拖拽抛射 ----------
+  const drag = { active: false, x0: 0, y0: 0, x1: 0, y1: 0 };
+
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  canvas.addEventListener('mousedown', e => {
+    const p = pos(e);
+    drag.active = true;
+    drag.x0 = drag.x1 = p.x;
+    drag.y0 = drag.y1 = p.y;
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!drag.active) return;
+    const p = pos(e);
+    drag.x1 = p.x; drag.y1 = p.y;
+  });
+  window.addEventListener('mouseup', e => {
+    if (!drag.active) return;
+    const p = pos(e);
+    // 拖拽方向与长度 → 初速度（弹弓：朝拖拽方向发射）
+    const vx = (p.x - drag.x0) * 0.05;
+    const vy = (p.y - drag.y0) * 0.05;
+    bodies.push(new Body(drag.x0, drag.y0, vx, vy, params.newMass));
+    drag.active = false;
+  });
+  // ---------- 控件绑定 ----------
+  const gSlider = document.getElementById('gSlider');
+  const expSlider = document.getElementById('expSlider');
+  const massSlider = document.getElementById('massSlider');
+
+  gSlider.addEventListener('input', () => {
+    params.G = +gSlider.value;
+    document.getElementById('gVal').textContent = params.G.toFixed(2);
+  });
+  expSlider.addEventListener('input', () => {
+    params.expansion = +expSlider.value;
+    document.getElementById('expVal').textContent = params.expansion.toFixed(2);
+  });
+  massSlider.addEventListener('input', () => {
+    params.newMass = +massSlider.value;
+    document.getElementById('massVal').textContent = params.newMass;
+  });
+
+  document.getElementById('trailChk').addEventListener('change', e => params.trails = e.target.checked);
+  document.getElementById('mergeChk').addEventListener('change', e => params.merge = e.target.checked);
+
+  const playBtn = document.getElementById('playBtn');
+  playBtn.addEventListener('click', () => {
+    params.running = !params.running;
+    playBtn.textContent = params.running ? 'Pause' : 'Resume';
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    bodies = [];
+    ctx.clearRect(0, 0, W, H);
+  });
+
+  // ---------- 预设场景 ----------
+  // 圆轨道速度：v = sqrt(G * M / r)
+  function orbitalSpeed(centralMass, r) {
+    return Math.sqrt(params.G * centralMass / r);
+  }
+
+  document.getElementById('galaxyBtn').addEventListener('click', () => {
+    bodies = [];
+    const cx = W / 2, cy = H / 2;
+    const centerMass = 6000;
+    bodies.push(new Body(cx, cy, 0, 0, centerMass));
+    const n = 260;
+    for (let i = 0; i < n; i++) {
+      const r = 40 + Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
+      const ang = Math.random() * Math.PI * 2;
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
+      const v = orbitalSpeed(centerMass, r);
+      // 切向速度（逆时针）
+      const vx = -Math.sin(ang) * v;
+      const vy = Math.cos(ang) * v;
+      bodies.push(new Body(x, y, vx, vy, 1 + Math.random() * 3));
+    }
+  });
+
+  document.getElementById('binaryBtn').addEventListener('click', () => {
+    bodies = [];
+    const cx = W / 2, cy = H / 2;
+    const m = 3000, sep = 180;
+    const r = sep / 2;
+    // 两等质量星体绕质心公转：v = sqrt(G*m / (2*sep))
+    const v = Math.sqrt(params.G * m / (2 * sep));
+    bodies.push(new Body(cx - r, cy, 0, -v, m));
+    bodies.push(new Body(cx + r, cy, 0, v, m));
+    // 少量伴星
+    for (let i = 0; i < 40; i++) {
+      const rr = 260 + Math.random() * Math.min(W, H) * 0.3;
+      const ang = Math.random() * Math.PI * 2;
+      const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr;
+      const vv = orbitalSpeed(2 * m, rr);
+      bodies.push(new Body(x, y, -Math.sin(ang) * vv, Math.cos(ang) * vv, 1 + Math.random() * 2));
+    }
+  });
+
+  // 首屏来一个星系
+  document.getElementById('galaxyBtn').click();
+  </script>
+</body>
+</html>
